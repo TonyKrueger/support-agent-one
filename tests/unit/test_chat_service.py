@@ -1,5 +1,8 @@
 """Tests for the chat service."""
 
+# Import test helper first to set environment variables
+import tests.helpers
+
 import pytest
 import logfire
 
@@ -7,9 +10,13 @@ from app.services.chat_service import ChatService
 
 
 @pytest.fixture
-def chat_service():
+def chat_service(supabase_client):
     """Create and return a chat service instance."""
-    return ChatService()
+    # Create a chat service with a mocked Supabase client
+    service = ChatService()
+    # Replace the created client with our mock
+    service.supabase = supabase_client
+    return service
 
 
 @pytest.fixture

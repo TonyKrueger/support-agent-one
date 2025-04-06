@@ -1,8 +1,45 @@
+import os
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Any, TypeVar, Generic, Dict
 
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent, RunContext
+
+# Import pydantic_ai conditionally to support testing
+if os.environ.get('TEST_MOCK_OPENAI') == 'true':
+    # Test Mock
+    from unittest.mock import MagicMock
+    
+    # Create a proxy for generics
+    T = TypeVar('T')
+    
+    class MockRunContext(Generic[T]):
+        """Mock for RunContext that supports generic type annotations."""
+        def __init__(self, *args, **kwargs):
+            self.deps = MagicMock()
+    
+    class MockAgent:
+        def __init__(self, *args, **kwargs):
+            pass
+        
+        def __call__(self, *args, **kwargs):
+            return MagicMock()
+        
+        def tool(self, func):
+            return func
+        
+        async def run(self, *args, **kwargs):
+            # Return a mock response
+            mock_result = MagicMock()
+            mock_result.data.support_response = "This is a test response."
+            mock_result.data.needs_followup = False
+            mock_result.data.suggested_documents = ["doc-123"]
+            return mock_result
+    
+    Agent = MockAgent
+    RunContext = MockRunContext
+else:
+    # Real implementation
+    from pydantic_ai import Agent, RunContext
 
 # Agent dependency types
 @dataclass
@@ -37,7 +74,7 @@ support_agent = Agent(
 
 # Document search tool
 @support_agent.tool
-async def search_documents(ctx: RunContext[AgentDependencies], query: str) -> List[dict]:
+async def search_documents(ctx: RunContext[AgentDependencies], query: str) -> List[Dict]:
     """
     Search the knowledge base for relevant documents.
     
@@ -60,7 +97,7 @@ async def search_documents(ctx: RunContext[AgentDependencies], query: str) -> Li
 
 # Product info lookup tool
 @support_agent.tool
-async def get_product_info(ctx: RunContext[AgentDependencies], serial_number: Optional[str] = None) -> dict:
+async def get_product_info(ctx: RunContext[AgentDependencies], serial_number: Optional[str] = None) -> Dict:
     """
     Get product information by serial number.
     
@@ -89,7 +126,7 @@ async def get_product_info(ctx: RunContext[AgentDependencies], serial_number: Op
 
 # Customer info lookup tool
 @support_agent.tool
-async def get_customer_info(ctx: RunContext[AgentDependencies], customer_id: Optional[str] = None) -> dict:
+async def get_customer_info(ctx: RunContext[AgentDependencies], customer_id: Optional[str] = None) -> Dict:
     """
     Get customer information by ID.
     

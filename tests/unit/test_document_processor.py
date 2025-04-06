@@ -7,13 +7,20 @@ from pathlib import Path
 import pytest
 import logfire
 
+# Import test helper first to set environment variables
+import tests.helpers
+
 from app.services.document_processor import DocumentProcessor
 
 
 @pytest.fixture
-def document_processor():
+def document_processor(supabase_client):
     """Create and return a document processor instance."""
-    return DocumentProcessor()
+    # Create a document processor with a mocked Supabase client
+    processor = DocumentProcessor()
+    # Replace the created client with our mock
+    processor.supabase = supabase_client
+    return processor
 
 
 @pytest.fixture

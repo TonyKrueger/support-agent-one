@@ -1,43 +1,26 @@
-[project]
+[tool.poetry]
 name = "support-agent-one"
 version = "0.1.0"
 description = "Support Agent with document search and customer history"
-authors = [
-    {name = "Tony Krueger"}
-]
+authors = ["Tony Krueger"]
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
-dependencies = [
-    "pydantic-ai (>=0.0.52,<0.0.53)",
-    "logfire>=3.12.0",
-    "fastapi (>=0.115.12,<0.116.0)",
-    "openai (>=1.70.0,<2.0.0)",
-    "supabase (>=2.15.0,<3.0.0)",
-    "langchain (>=0.3.23,<0.4.0)",
-    "pypdf2 (>=3.0.1,<4.0.0)",
-    "pdfminer-six (>=20250327,<20250328)",
-    "beautifulsoup4 (>=4.13.3,<5.0.0)",
-    "nltk (>=3.9.1,<4.0.0)",
-    "spacy (>=3.8.5,<4.0.0)",
-    "python-dotenv (>=1.1.0,<2.0.0)",
-    "uvicorn[standard] (>=0.34.0,<0.35.0)"
-]
+packages = [{include = "app"}]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "httpx>=0.24.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "mypy>=1.0.0",
-    "ruff>=0.0.270"
-]
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+pydantic-ai = ">=0.0.52,<0.0.53"
+logfire = ">=3.12.0"
+fastapi = ">=0.115.12,<0.116.0"
+openai = ">=1.70.0,<2.0.0"
+supabase = ">=2.15.0,<3.0.0"
+langchain = ">=0.3.23,<0.4.0"
+pypdf2 = ">=3.0.1,<4.0.0"
+pdfminer-six = ">=20250327,<20250328"
+beautifulsoup4 = ">=4.13.3,<5.0.0"
+nltk = ">=3.9.1,<4.0.0"
+spacy = ">=3.8.5,<4.0.0"
+python-dotenv = ">=1.1.0,<2.0.0"
+uvicorn = {extras = ["standard"], version = ">=0.34.0,<0.35.0"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
@@ -49,3 +32,6 @@ isort = "^6.0.1"
 mypy = "^1.15.0"
 ruff = "^0.11.4"
 
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

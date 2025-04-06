@@ -15,6 +15,14 @@ class Settings(BaseSettings):
     supabase_url: str = Field(...)
     supabase_key: str = Field(...)
     supabase_service_key: Optional[str] = Field(None)
+    supabase_db_password: Optional[str] = Field(None)
+    
+    # Testing settings
+    test_mock_openai: Optional[bool] = Field(False)
+    test_mock_supabase: Optional[bool] = Field(False)
+    
+    # Logging
+    logfire_write_token: Optional[str] = Field(None)
     
     # Application settings
     log_level: str = Field("info")
@@ -31,8 +39,9 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # Configure logging
-import logfire
-from logfire import configure_logfire
+import logging
 
-configure_logfire(level=settings.log_level.upper())
-logfire.info("Application settings loaded", environment=settings.environment) 
+# Set up logging based on environment
+log_level = getattr(logging, settings.log_level.upper())
+logging.basicConfig(level=log_level)
+logging.info("Application settings loaded, environment=%s", settings.environment) 

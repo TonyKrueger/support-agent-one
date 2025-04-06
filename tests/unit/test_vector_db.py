@@ -2,14 +2,25 @@
 
 import pytest
 import logfire
+import tests.helpers
+from unittest.mock import MagicMock
 
 from app.utils.vector_db import VectorDB
 
 
 @pytest.fixture
-def vector_db():
+def vector_db(supabase_client):
     """Create and return a vector database utility instance."""
-    return VectorDB()
+    # Create a VectorDB with a mocked Supabase client
+    vector_db = VectorDB()
+    # Replace the created client with our mock
+    vector_db.supabase = supabase_client
+    
+    # Mock the OpenAI client as well
+    vector_db.openai_client = MagicMock()
+    vector_db.openai_client.embeddings.create.return_value.data = [MagicMock(embedding=[0.1] * 1536)]
+    
+    return vector_db
 
 
 @pytest.mark.asyncio

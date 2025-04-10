@@ -10,28 +10,46 @@ sidebar_position: 0
 
 Welcome to the Support Agent Project Wiki. This documentation provides comprehensive information about the project's architecture, components, and implementation details.
 
-## Documentation Sections
+## Documentation Index
 
-### Infrastructure
+### System Architecture
+* [System Overview](SystemOverview.md)
+* [Database Schema](DatabaseSchema.md)
+* [API Documentation](API.md)
 
-- [Supabase Setup and Configuration](./Supabase.md) - Details about the database infrastructure, schemas, and access patterns
-- [OpenAI Integration](./OpenAI.md) - Information about the AI models, embedding generation, and completions
+### Core Components
+* [Document Processing](DocumentProcessing.md)
+* [Document Management](DocumentManagement.md)
+* [Vector Search](VectorSearch.md)
+* [Conversation Management](ConversationManagement.md)
+* [Agent System](AgentSystem.md)
 
-### Implementation
+### Integrations
+* [OpenAI Integration](OpenAI.md)
+* [Supabase Integration](Supabase.md)
 
-- [Document Processing Pipeline](./DocumentProcessing.md) - Overview of document ingestion and embedding generation
-- Support Agent Core - Documentation for the main agent functionality (Coming Soon)
+### Development
+* [Development Setup](DevelopmentSetup.md)
+* [Testing Guidelines](TestingGuidelines.md)
+* [Deployment Process](Deployment.md)
 
-### API Documentation (Coming Soon)
+### Usage
+* [User Guide](UserGuide.md)
+* [Administration](Administration.md)
+* [Troubleshooting](Troubleshooting.md)
 
-- API Endpoints - Reference for available API routes
-- Data Models - Schema details for request and response objects
+## Using This Wiki
 
-### Development (Coming Soon)
+New pages should be created using the [template](template.md) for consistency.
 
-- Setup Guide - Instructions for setting up the development environment
-- Testing - Guidelines for testing the application
-- Deployment - Procedures for deploying the application
+Each document should:
+1. Start with a clear title and overview
+2. Include relevant code examples where appropriate
+3. Link to related documents
+4. Include a "last updated" date when making significant changes
+
+## Last Updated
+Date: 2023-05-15
 
 ## Getting Started
 

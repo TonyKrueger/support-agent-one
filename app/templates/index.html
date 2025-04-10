@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Support Agent One - Home{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 text-center mb-4">
+        <h1 class="display-4">Support Agent One</h1>
+        <p class="lead">Intelligent support agent with document search and customer history</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Document Management</h5>
+                <p class="card-text">Manage support documents with vector search</p>
+                <a href="/documents" class="btn btn-primary">View Documents</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Search Documents</h5>
+                <p class="card-text">Search for relevant information with vector similarity</p>
+                <a href="/documents/search" class="btn btn-primary">Search</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Add Documents</h5>
+                <p class="card-text">Add new knowledge to the support database</p>
+                <a href="/documents/create" class="btn btn-primary">Create Document</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

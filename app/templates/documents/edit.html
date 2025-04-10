@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Document{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1>Edit Document</h1>
+        <p class="text-muted">ID: {{ document.id }}</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="/documents/{{ document.id }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <form action="/documents/{{ document.id }}/edit" method="post">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="title" name="title" value="{{ document.title }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="content" class="form-label">Content</label>
+                        <textarea class="form-control" id="content" name="content" rows="10" required>{{ document.content }}</textarea>
+                        <div class="form-text">Editing the content will regenerate the document's embedding vector.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="metadata" class="form-label">Metadata (JSON)</label>
+                        <textarea class="form-control" id="metadata" name="metadata" rows="4">{{ document.metadata | tojson(indent=2) }}</textarea>
+                        <div class="form-text">Metadata in JSON format.</div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <a href="/documents/{{ document.id }}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                        <div>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

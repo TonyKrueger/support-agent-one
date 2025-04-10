@@ -5,7 +5,8 @@ This module provides configuration settings for AI model interactions.
 These settings can be adjusted based on the specific needs of the application.
 """
 
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 from typing import Optional, Dict, Any
 
 
@@ -43,8 +44,9 @@ class AISettings(BaseSettings):
     rate_limit_requests: int = Field(default=60, ge=1)  # requests per minute
     
     class Config:
-        env_prefix = "AI_"
+        env_prefix = ""
         env_file = ".env"
+        extra = "ignore"
 
 
 # Create a singleton instance

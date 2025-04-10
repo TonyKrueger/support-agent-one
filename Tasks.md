@@ -29,7 +29,18 @@
 
 ## Phase 2: Support Agent Core
 - [ ] Build basic chat interface
+  - [x] Implement conversation data models
+  - [x] Create ChatService for message processing
+  - [x] Set up conversation_manager service
+  - [x] Create UI for chat interface
+  - [x] Connect API endpoints to chat service
+  - [ ] Integrate with AI model for responses
 - [ ] Implement conversation context management
+  - [x] Create context_manager utility
+  - [x] Implement conversation history tracking
+  - [x] Add document retrieval integration
+  - [x] Implement conversation storage
+  - [ ] Add versioning and persistence for long-term storage
 - [x] Create document retrieval system using vector search
   - [x] Implement vector similarity search function
   - [x] Create DocumentService for document operations

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Conversation History{% endblock %}
+
+{% block extra_css %}
+<style>
+    .history-container {
+        margin-top: 2rem;
+    }
+    
+    .message {
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border-radius: 0.5rem;
+    }
+    
+    .message-user {
+        background-color: #e3f2fd;
+        margin-left: 2rem;
+    }
+    
+    .message-assistant {
+        background-color: #f5f5f5;
+        margin-right: 2rem;
+    }
+    
+    .message-metadata {
+        font-size: 0.8rem;
+        color: #666;
+        margin-top: 0.5rem;
+    }
+    
+    .timestamp {
+        float: right;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1>Conversation History</h1>
+        <p class="text-muted">Conversation ID: {{ conversation_id }}</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="/chat" class="btn btn-primary">New Chat</a>
+        <a href="/chat?conversation_id={{ conversation_id }}" class="btn btn-outline-primary">Continue Chat</a>
+    </div>
+</div>
+
+<div class="history-container">
+    {% if history %}
+        {% for message in history %}
+            <div class="message message-{{ message.role }}">
+                <div class="message-content">{{ message.content }}</div>
+                <div class="message-metadata">
+                    <span class="message-role">{{ message.role|title }}</span>
+                    {% if message.timestamp %}
+                        <span class="timestamp">{{ message.timestamp }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info">
+            No messages found in this conversation.
+        </div>
+    {% endif %}
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <form action="/chat/end/{{ conversation_id }}" method="post" onsubmit="return confirm('Are you sure you want to end this conversation? It will be archived and can no longer be continued.');">
+            <button type="submit" class="btn btn-danger">End Conversation</button>
+        </form>
+    </div>
+</div>
+{% endblock %} 

@@ -1,4 +1,5 @@
 from typing import List, Dict, Any, Optional
+import time
 
 import logfire
 from supabase import create_client
@@ -76,13 +77,26 @@ class ChatService:
         Returns:
             A list of conversation messages
         """
-        # TODO: Implement actual database retrieval
-        # This is a placeholder implementation
-        logfire.info("Getting conversation history", customer_id=customer_id)
-        return [
-            {"role": "user", "content": "Hi, I need help with my product."},
-            {"role": "assistant", "content": "Hello! I'd be happy to help. What issue are you experiencing?"}
-        ]
+        try:
+            # Retrieve conversations from Supabase
+            result = self.supabase.table("conversations")\
+                .select("id, messages, created_at")\
+                .eq("customer_id", customer_id)\
+                .order("created_at", desc=True)\
+                .execute()
+            
+            if result.data and len(result.data) > 0:
+                # Return the messages from the most recent conversation
+                return result.data[0].get("messages", [])
+            
+            return []
+            
+        except Exception as e:
+            logfire.error("Error retrieving conversation history", 
+                        customer_id=customer_id,
+                        error=str(e))
+            # Return empty list on error
+            return []
     
     async def _store_conversation(
         self, 
@@ -100,8 +114,46 @@ class ChatService:
             customer_id: Optional customer ID
             product_serial: Optional product serial number
         """
-        # TODO: Implement actual database storage
-        logfire.info("Storing conversation", 
-                   message_count=len(messages), 
-                   customer_id=customer_id,
-                   product_serial=product_serial) 
+        try:
+            # Format messages for storage
+            formatted_messages = []
+            for msg in messages:
+                formatted_messages.append({
+                    "role": msg.get("role", "unknown"),
+                    "content": msg.get("content", ""),
+                    "timestamp": msg.get("timestamp", time.time())
+                })
+            
+            # Add the latest assistant response
+            formatted_messages.append({
+                "role": "assistant",
+                "content": result.support_response,
+                "timestamp": time.time()
+            })
+            
+            # Create metadata
+            metadata = {
+                "needs_followup": result.needs_followup,
+                "suggested_documents": result.suggested_documents,
+                "product_serial": product_serial
+            }
+            
+            # Store in Supabase
+            conversation_data = {
+                "customer_id": customer_id,
+                "messages": formatted_messages,
+                "metadata": metadata
+            }
+            
+            self.supabase.table("conversations").insert(conversation_data).execute()
+            
+            logfire.info("Stored conversation", 
+                       message_count=len(formatted_messages), 
+                       customer_id=customer_id,
+                       product_serial=product_serial)
+                       
+        except Exception as e:
+            logfire.error("Failed to store conversation", 
+                        error=str(e),
+                        customer_id=customer_id,
+                        product_serial=product_serial) 

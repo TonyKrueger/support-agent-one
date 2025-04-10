@@ -21,6 +21,7 @@ Welcome to the Support Agent Project Wiki. This documentation provides comprehen
 * [Document Processing](DocumentProcessing.md)
 * [Document Management](DocumentManagement.md)
 * [Vector Search](VectorSearch.md)
+* [Chat Interface](ChatInterface.md)
 * [Conversation Management](ConversationManagement.md)
 * [Agent System](AgentSystem.md)
 
@@ -49,7 +50,7 @@ Each document should:
 4. Include a "last updated" date when making significant changes
 
 ## Last Updated
-Date: 2023-05-15
+Date: 2025-04-09
 
 ## Getting Started
 

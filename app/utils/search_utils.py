@@ -4,13 +4,23 @@ from typing import Dict, List, Any, Optional, Tuple, Union
 
 import openai
 from app.services.client import init_supabase_client
+from app.config.settings import settings  # Import settings for consistent API key access
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client
-openai_client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+try:
+    openai_api_key = settings.OPENAI_API_KEY
+except (AttributeError, ImportError):
+    openai_api_key = os.environ.get("OPENAI__API_KEY") or os.environ.get("OPENAI_API_KEY")
+
+if not openai_api_key:
+    logger.error("OpenAI API key not found in settings or environment variables")
+    raise ValueError("OpenAI API key not found. Please set OPENAI__API_KEY in your .env file")
+
+openai_client = openai.OpenAI(api_key=openai_api_key)
 
 # Constants
 EMBEDDING_MODEL = "text-embedding-3-small"

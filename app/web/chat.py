@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 from typing import Dict, List, Optional
 import json
 import uuid
+import logfire
 from pathlib import Path
 
 from app.services.conversation_manager import ConversationManager
@@ -21,21 +22,37 @@ active_conversations: Dict[str, ConversationManager] = {}
 def get_conversation_manager(conversation_id: Optional[str] = None) -> ConversationManager:
     """Dependency for ConversationManager."""
     try:
+        # Log conversation ID for debugging
+        logfire.debug("get_conversation_manager called", 
+                     conversation_id=conversation_id, 
+                     active_conversations_count=len(active_conversations),
+                     active_conversation_ids=list(active_conversations.keys()))
+        
         # Create new conversation if not provided
         if not conversation_id or conversation_id not in active_conversations:
             manager = ConversationManager(max_conversation_length=ai_settings.max_conversation_messages)
             if not conversation_id:
                 conversation_id = manager.create_conversation()
+                logfire.info("Created new conversation", new_conversation_id=conversation_id)
+            else:
+                logfire.info("Initializing manager for existing conversation ID", conversation_id=conversation_id)
             active_conversations[conversation_id] = manager
         
         return active_conversations[conversation_id]
     except Exception as e:
+        logfire.error("Error in get_conversation_manager", 
+                     error=str(e), 
+                     conversation_id=conversation_id,
+                     active_conversations=list(active_conversations.keys()))
         raise HTTPException(status_code=500, detail=f"Conversation manager unavailable: {str(e)}")
 
 @router.get("/", response_class=HTMLResponse)
 async def chat_home(request: Request):
     """Chat interface home page."""
     conversation_id = str(uuid.uuid4())
+    logfire.info("Generating chat home page with new conversation", 
+                conversation_id=conversation_id,
+                client_ip=request.client.host)
     return templates.TemplateResponse(
         "chat/index.html", 
         {"request": request, "conversation_id": conversation_id}
@@ -49,10 +66,17 @@ async def send_message(
 ):
     """Handle sending a message via traditional HTTP request."""
     try:
+        logfire.info("Message received", 
+                    conversation_id=conversation_id, 
+                    message_length=len(message))
+        
         # Check for harmful content if moderation is enabled
         if ai_settings.moderation_enabled:
             is_harmful, categories = moderate_content(message)
             if is_harmful:
+                logfire.warning("Message moderated", 
+                               conversation_id=conversation_id,
+                               categories=categories)
                 return {
                     "conversation_id": conversation_id,
                     "message": "I'm sorry, but I cannot respond to this message as it may contain harmful content.",
@@ -60,7 +84,15 @@ async def send_message(
                 }
             
         # Add user message to conversation
-        conversation_manager.add_message(conversation_id, "user", message)
+        try:
+            conversation_manager.add_message(conversation_id, "user", message)
+            logfire.debug("User message added to conversation", conversation_id=conversation_id)
+        except ValueError as e:
+            logfire.error("Failed to add message to conversation", 
+                         error=str(e), 
+                         conversation_id=conversation_id,
+                         active_conversation_ids=list(active_conversations.keys()))
+            raise HTTPException(status_code=400, detail=str(e))
         
         # Get relevant context
         context = conversation_manager.retrieve_relevant_context(
@@ -74,6 +106,11 @@ async def send_message(
         chat_context = conversation_manager.get_chat_context(conversation_id)
         
         # Call AI model for response using OpenAI service with settings
+        logfire.info("Requesting chat completion", 
+                    conversation_id=conversation_id,
+                    model=ai_settings.model,
+                    temperature=ai_settings.temperature)
+        
         ai_response = get_chat_completion(
             messages=chat_context,
             temperature=ai_settings.temperature,
@@ -87,6 +124,11 @@ async def send_message(
         # Get conversation history for display
         history = conversation_manager.get_conversation_history(conversation_id)
         
+        logfire.info("Response generated successfully", 
+                    conversation_id=conversation_id,
+                    response_length=len(ai_response),
+                    history_messages_count=len(history))
+        
         return {
             "conversation_id": conversation_id,
             "message": ai_response,
@@ -94,6 +136,9 @@ async def send_message(
         }
     except RateLimitExceededError as e:
         # Handle rate limit errors specifically
+        logfire.warning("Rate limit exceeded", 
+                       conversation_id=conversation_id,
+                       retry_after=e.retry_after)
         return {
             "conversation_id": conversation_id,
             "message": "The system is currently experiencing high demand. Please try again in a moment.",
@@ -102,6 +147,9 @@ async def send_message(
         }
     except OpenAIServiceError as e:
         # Handle OpenAI service errors
+        logfire.error("OpenAI service error", 
+                     conversation_id=conversation_id,
+                     error=str(e))
         error_message = f"The AI service is currently unavailable: {str(e)}"
         return {
             "conversation_id": conversation_id,
@@ -109,6 +157,10 @@ async def send_message(
             "error": True
         }
     except Exception as e:
+        logfire.error("Unexpected error in send_message", 
+                     conversation_id=conversation_id,
+                     error=str(e),
+                     error_type=type(e).__name__)
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
 
 @router.websocket("/ws/{conversation_id}")
@@ -117,11 +169,28 @@ async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
     try:
         await websocket.accept()
         
+        logfire.info("WebSocket connection established", 
+                    conversation_id=conversation_id,
+                    client=websocket.client.host)
+        
         # Get or create conversation manager
         if conversation_id not in active_conversations:
+            logfire.debug("Creating new conversation manager for websocket", 
+                         conversation_id=conversation_id)
             manager = ConversationManager(max_conversation_length=ai_settings.max_conversation_messages)
+            
             if conversation_id == "new":
+                # Generate a new ID when "new" is specified
                 conversation_id = manager.create_conversation()
+                logfire.info("Created new conversation via websocket", 
+                            new_conversation_id=conversation_id)
+            else:
+                # Register the existing ID in the conversation manager
+                logfire.info("Registering existing conversation ID in manager", 
+                            conversation_id=conversation_id)
+                # This creates an entry in the manager's internal dictionary
+                manager.create_conversation(conversation_id=conversation_id)
+                
             active_conversations[conversation_id] = manager
         
         conversation_manager = active_conversations[conversation_id]

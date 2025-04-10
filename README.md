@@ -44,7 +44,27 @@ cp .env.example .env
 
 4. Run the development server
 ```bash
+# Method 1: Export OpenAI API key separately (recommended)
+export OPENAI_API_KEY="$(grep OPENAI_API_KEY .env | cut -d'=' -f2)"
 poetry run python -m app.main
+
+# Method 2: Use environment variables from .env file 
+# Note: Make sure both OPENAI_API_KEY and OPENAI__API_KEY are defined in .env
+poetry run python -m app.main
+```
+
+## Environment Variable Configuration
+
+This application uses two formats for environment variables:
+- Standard format: `OPENAI_API_KEY` (used by direct access via os.getenv)
+- Nested format: `OPENAI__API_KEY` (used by Pydantic settings with double underscores)
+
+Due to inconsistencies in how the libraries access the API key, both formats are required in the .env file:
+
+```
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key
+OPENAI__API_KEY=your_openai_api_key
 ```
 
 ## Project Structure

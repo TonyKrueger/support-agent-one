@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Any, Union
 from dotenv import load_dotenv
 import openai
 from supabase import create_client
+from app.config.settings import settings  # Import settings for consistent API key handling
 
 # Load environment variables
 load_dotenv()
@@ -23,7 +24,14 @@ try:
     supabase_key = os.environ.get("SUPABASE_KEY")
     supabase = create_client(supabase_url, supabase_key)
     
-    openai.api_key = os.environ.get("OPENAI_API_KEY")
+    # Get API key with proper fallbacks
+    try:
+        openai.api_key = settings.OPENAI_API_KEY
+    except (AttributeError, ImportError):
+        openai.api_key = os.environ.get("OPENAI__API_KEY") or os.environ.get("OPENAI_API_KEY")
+    
+    if not openai.api_key:
+        raise ValueError("OpenAI API key not found. Please set OPENAI__API_KEY in your .env file")
     
     logger.info("Initialized Supabase and OpenAI clients")
 except Exception as e:

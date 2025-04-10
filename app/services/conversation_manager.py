@@ -6,6 +6,8 @@ This module manages conversation history, context, and state for the support age
 
 import time
 import uuid
+import logging
+import logfire
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, field
 
@@ -13,7 +15,8 @@ from app.services.document_retrieval import search_and_format_query
 from app.services.supabase_service import store_document
 from app.utils.logger import get_logger
 
-logger = get_logger(__name__)
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -50,13 +53,15 @@ class ConversationManager:
         """
         self.max_conversation_length = max_conversation_length
         self.active_conversations: Dict[str, ConversationContext] = {}
-        logger.info("Conversation manager initialized")
+        logfire.info("ConversationManager initialized", 
+                    max_conversation_length=max_conversation_length)
         
     def create_conversation(
         self,
         customer_id: Optional[str] = None,
         product_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        conversation_id: Optional[str] = None
     ) -> str:
         """
         Create a new conversation.
@@ -64,12 +69,22 @@ class ConversationManager:
         Args:
             customer_id: Optional customer identifier
             product_id: Optional product identifier
-            metadata: Optional metadata for the conversation
+            metadata: Optional conversation metadata
+            conversation_id: Optional existing conversation ID to register
             
         Returns:
             The new conversation ID
         """
-        conversation_id = str(uuid.uuid4())
+        # Use provided ID or generate a new one
+        if not conversation_id:
+            conversation_id = str(uuid.uuid4())
+        
+        # Check if this ID is already in use
+        if conversation_id in self.active_conversations:
+            logfire.warning("Conversation ID already exists", 
+                           conversation_id=conversation_id,
+                           action="returning_existing")
+            return conversation_id
         
         context = ConversationContext(
             conversation_id=conversation_id,
@@ -80,6 +95,11 @@ class ConversationManager:
         
         self.active_conversations[conversation_id] = context
         logger.info(f"Created new conversation: {conversation_id}")
+        logfire.info("New conversation created", 
+                    conversation_id=conversation_id,
+                    customer_id=customer_id,
+                    product_id=product_id,
+                    active_conversations_count=len(self.active_conversations))
         
         return conversation_id
         
@@ -102,10 +122,22 @@ class ConversationManager:
         Raises:
             ValueError: If the conversation ID is invalid or role is invalid
         """
+        logfire.debug("Adding message to conversation", 
+                     conversation_id=conversation_id,
+                     role=role,
+                     content_length=len(content),
+                     active_conversations=list(self.active_conversations.keys()))
+                     
         if conversation_id not in self.active_conversations:
+            logfire.error("Invalid conversation ID in add_message", 
+                         conversation_id=conversation_id,
+                         active_conversations=list(self.active_conversations.keys()))
             raise ValueError(f"Invalid conversation ID: {conversation_id}")
             
         if role not in ["user", "assistant"]:
+            logfire.error("Invalid message role", 
+                         conversation_id=conversation_id,
+                         role=role)
             raise ValueError(f"Invalid message role: {role}")
             
         message = Message(
@@ -116,6 +148,9 @@ class ConversationManager:
         
         self.active_conversations[conversation_id].messages.append(message)
         logger.debug(f"Added {role} message to conversation {conversation_id}")
+        logfire.debug(f"Added {role} message to conversation", 
+                     conversation_id=conversation_id,
+                     message_count=len(self.active_conversations[conversation_id].messages))
         
     def get_conversation_history(
         self,
@@ -135,7 +170,15 @@ class ConversationManager:
         Raises:
             ValueError: If the conversation ID is invalid
         """
+        logfire.debug("Getting conversation history", 
+                     conversation_id=conversation_id,
+                     limit=limit,
+                     active_conversations=list(self.active_conversations.keys()))
+                     
         if conversation_id not in self.active_conversations:
+            logfire.error("Invalid conversation ID in get_conversation_history", 
+                         conversation_id=conversation_id,
+                         active_conversations=list(self.active_conversations.keys()))
             raise ValueError(f"Invalid conversation ID: {conversation_id}")
             
         messages = self.active_conversations[conversation_id].messages
@@ -144,7 +187,7 @@ class ConversationManager:
             messages = messages[-limit:]
             
         # Convert to dictionaries for serialization
-        return [
+        history = [
             {
                 "role": msg.role,
                 "content": msg.content,
@@ -153,6 +196,12 @@ class ConversationManager:
             }
             for msg in messages
         ]
+        
+        logfire.debug("Retrieved conversation history", 
+                     conversation_id=conversation_id,
+                     message_count=len(history))
+        
+        return history
         
     def retrieve_relevant_context(
         self,
@@ -176,7 +225,16 @@ class ConversationManager:
         Raises:
             ValueError: If the conversation ID is invalid
         """
+        logfire.debug("Retrieving relevant context", 
+                     conversation_id=conversation_id,
+                     query_length=len(query),
+                     limit=limit,
+                     threshold=threshold)
+                     
         if conversation_id not in self.active_conversations:
+            logfire.error("Invalid conversation ID in retrieve_relevant_context", 
+                         conversation_id=conversation_id,
+                         active_conversations=list(self.active_conversations.keys()))
             raise ValueError(f"Invalid conversation ID: {conversation_id}")
             
         context = self.active_conversations[conversation_id]
@@ -187,17 +245,27 @@ class ConversationManager:
             filters["product_id"] = context.product_id
             
         # Retrieve relevant documents
-        relevant_docs = search_and_format_query(
-            query=query,
-            limit=limit,
-            threshold=threshold,
-            filters=filters
-        )
-        
-        # Update conversation context with relevant documents
-        context.relevant_docs = relevant_docs
-        
-        return relevant_docs
+        try:
+            relevant_docs = search_and_format_query(
+                query=query,
+                limit=limit,
+                threshold=threshold,
+                filters=filters
+            )
+            
+            # Update conversation context with relevant documents
+            context.relevant_docs = relevant_docs
+            
+            logfire.info("Retrieved relevant context", 
+                        conversation_id=conversation_id,
+                        context_length=len(relevant_docs))
+                        
+            return relevant_docs
+        except Exception as e:
+            logfire.error("Error retrieving relevant context", 
+                         conversation_id=conversation_id,
+                         error=str(e))
+            raise
         
     def get_chat_context(
         self,
@@ -215,7 +283,14 @@ class ConversationManager:
         Raises:
             ValueError: If the conversation ID is invalid
         """
+        logfire.debug("Getting chat context", 
+                     conversation_id=conversation_id,
+                     active_conversations=list(self.active_conversations.keys()))
+                     
         if conversation_id not in self.active_conversations:
+            logfire.error("Invalid conversation ID in get_chat_context", 
+                         conversation_id=conversation_id,
+                         active_conversations=list(self.active_conversations.keys()))
             raise ValueError(f"Invalid conversation ID: {conversation_id}")
             
         context = self.active_conversations[conversation_id]
@@ -232,6 +307,10 @@ class ConversationManager:
                 "role": message.role,
                 "content": message.content
             })
+            
+        logfire.debug("Chat context prepared", 
+                     conversation_id=conversation_id,
+                     message_count=len(chat_messages))
             
         return chat_messages
         

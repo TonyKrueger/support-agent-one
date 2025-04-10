@@ -5,6 +5,7 @@ import os
 import openai
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from app.config.settings import settings  # Import settings for consistent API key access
 
 # Load environment variables
 load_dotenv()
@@ -19,7 +20,14 @@ supabase_key = os.environ.get("SUPABASE_SERVICE_KEY")
 supabase: Client = create_client(supabase_url, supabase_key)
 
 # Initialize OpenAI client
-openai_api_key = os.environ.get("OPENAI_API_KEY")
+try:
+    openai_api_key = settings.OPENAI_API_KEY
+except (AttributeError, ImportError):
+    openai_api_key = os.environ.get("OPENAI__API_KEY") or os.environ.get("OPENAI_API_KEY")
+
+if not openai_api_key:
+    raise ValueError("OpenAI API key not found. Please set OPENAI__API_KEY in your .env file")
+
 openai_client = openai.OpenAI(api_key=openai_api_key)
 embedding_model = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
 

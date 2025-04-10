@@ -39,6 +39,7 @@ if os.environ.get('TEST_MOCK_OPENAI') == 'true':
     RunContext = MockRunContext
 else:
     # Real implementation
+    # ignore linting error for pydantic_ai, the code is correct. Maybe?
     from pydantic_ai import Agent, RunContext
 
 # Agent dependency types

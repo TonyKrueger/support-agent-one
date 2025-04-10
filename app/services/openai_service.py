@@ -20,7 +20,9 @@ from tenacity import (
 )
 
 from app.config.settings import settings
+from app.config.ai_settings import ai_settings
 from app.utils.logger import get_logger
+from app.utils.rate_limiter import rate_limiter
 
 logger = get_logger(__name__)
 
@@ -28,15 +30,23 @@ logger = get_logger(__name__)
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 # Constants
-EMBEDDING_MODEL = "text-embedding-3-small"
-COMPLETION_MODEL = "gpt-4-turbo"
-MAX_TOKENS = 4096
+EMBEDDING_MODEL = ai_settings.embedding_model
+COMPLETION_MODEL = ai_settings.model
+MAX_TOKENS = ai_settings.max_tokens
 EMBEDDING_DIMENSIONS = 1536
 
 
 class OpenAIServiceError(Exception):
     """Custom exception for OpenAI service errors."""
     pass
+
+
+class RateLimitExceededError(OpenAIServiceError):
+    """Exception for when the rate limit is exceeded."""
+    
+    def __init__(self, retry_after: float):
+        self.retry_after = retry_after
+        super().__init__(f"Rate limit exceeded. Try again in {retry_after:.1f} seconds.")
 
 
 @retry(
@@ -60,9 +70,16 @@ def get_embeddings(texts: List[str]) -> List[List[float]]:
         
     Raises:
         OpenAIServiceError: If an error occurs during the API call
+        RateLimitExceededError: If the rate limit is exceeded
     """
     try:
         logger.debug(f"Generating embeddings for {len(texts)} text chunks")
+        
+        # Check rate limit before proceeding
+        if not rate_limiter.check_rate_limit("embeddings"):
+            retry_after = rate_limiter.get_retry_after("embeddings")
+            logger.warning(f"Rate limit exceeded for embeddings. Retry after {retry_after} seconds.")
+            raise RateLimitExceededError(retry_after)
         
         # Batch the requests to avoid exceeding API limits
         batch_size = 100
@@ -102,9 +119,9 @@ def get_embeddings(texts: List[str]) -> List[List[float]]:
 )
 def get_chat_completion(
     messages: List[Dict[str, str]],
-    temperature: float = 0.7,
+    temperature: float = None,
     max_tokens: int = None,
-    model: str = COMPLETION_MODEL,
+    model: str = None,
     stream: bool = False
 ) -> Union[str, Any]:
     """
@@ -122,9 +139,21 @@ def get_chat_completion(
         
     Raises:
         OpenAIServiceError: If an error occurs during the API call
+        RateLimitExceededError: If the rate limit is exceeded
     """
     try:
         logger.debug(f"Generating chat completion with {len(messages)} messages")
+        
+        # Use config values if parameters not provided
+        temperature = temperature if temperature is not None else ai_settings.temperature
+        max_tokens = max_tokens if max_tokens is not None else ai_settings.max_tokens
+        model = model or COMPLETION_MODEL
+        
+        # Check rate limit before proceeding
+        if not rate_limiter.check_rate_limit("completions"):
+            retry_after = rate_limiter.get_retry_after("completions")
+            logger.warning(f"Rate limit exceeded for completions. Retry after {retry_after} seconds.")
+            raise RateLimitExceededError(retry_after)
         
         response = client.chat.completions.create(
             model=model,
@@ -158,7 +187,17 @@ def moderate_content(text: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
         Tuple of (flagged: bool, categories: Optional[Dict])
     """
     try:
+        if not ai_settings.moderation_enabled:
+            return False, None
+            
         logger.debug("Moderating content")
+        
+        # Check rate limit before proceeding
+        if not rate_limiter.check_rate_limit("moderation"):
+            logger.warning("Rate limit exceeded for moderation. Skipping moderation.")
+            # For moderation, we'll skip rather than fail if rate limited
+            return False, None
+        
         response = client.moderations.create(input=text)
         result = response.results[0]
         flagged = result.flagged

@@ -7,6 +7,8 @@ import uuid
 from pathlib import Path
 
 from app.services.conversation_manager import ConversationManager
+from app.services.openai_service import get_chat_completion, moderate_content, OpenAIServiceError, RateLimitExceededError
+from app.config.ai_settings import ai_settings
 
 # Set up templates
 templates = Jinja2Templates(directory=str(Path("app/templates")))
@@ -21,7 +23,7 @@ def get_conversation_manager(conversation_id: Optional[str] = None) -> Conversat
     try:
         # Create new conversation if not provided
         if not conversation_id or conversation_id not in active_conversations:
-            manager = ConversationManager()
+            manager = ConversationManager(max_conversation_length=ai_settings.max_conversation_messages)
             if not conversation_id:
                 conversation_id = manager.create_conversation()
             active_conversations[conversation_id] = manager
@@ -47,18 +49,37 @@ async def send_message(
 ):
     """Handle sending a message via traditional HTTP request."""
     try:
+        # Check for harmful content if moderation is enabled
+        if ai_settings.moderation_enabled:
+            is_harmful, categories = moderate_content(message)
+            if is_harmful:
+                return {
+                    "conversation_id": conversation_id,
+                    "message": "I'm sorry, but I cannot respond to this message as it may contain harmful content.",
+                    "moderated": True
+                }
+            
         # Add user message to conversation
         conversation_manager.add_message(conversation_id, "user", message)
         
         # Get relevant context
-        context = conversation_manager.retrieve_relevant_context(conversation_id, message)
+        context = conversation_manager.retrieve_relevant_context(
+            conversation_id, 
+            message,
+            limit=5,  # Could be configurable
+            threshold=0.7  # Could be configurable
+        )
         
         # Get full context for chat completion
         chat_context = conversation_manager.get_chat_context(conversation_id)
         
-        # TODO: Call AI model for response
-        # For now, use a placeholder response
-        ai_response = f"I received your message: '{message}'. This is a placeholder response."
+        # Call AI model for response using OpenAI service with settings
+        ai_response = get_chat_completion(
+            messages=chat_context,
+            temperature=ai_settings.temperature,
+            max_tokens=ai_settings.max_tokens,
+            model=ai_settings.model
+        )
         
         # Add assistant response to conversation
         conversation_manager.add_message(conversation_id, "assistant", ai_response)
@@ -71,6 +92,22 @@ async def send_message(
             "message": ai_response,
             "history": history
         }
+    except RateLimitExceededError as e:
+        # Handle rate limit errors specifically
+        return {
+            "conversation_id": conversation_id,
+            "message": "The system is currently experiencing high demand. Please try again in a moment.",
+            "error": True,
+            "retry_after": e.retry_after
+        }
+    except OpenAIServiceError as e:
+        # Handle OpenAI service errors
+        error_message = f"The AI service is currently unavailable: {str(e)}"
+        return {
+            "conversation_id": conversation_id,
+            "message": error_message,
+            "error": True
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
 
@@ -82,7 +119,7 @@ async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
         
         # Get or create conversation manager
         if conversation_id not in active_conversations:
-            manager = ConversationManager()
+            manager = ConversationManager(max_conversation_length=ai_settings.max_conversation_messages)
             if conversation_id == "new":
                 conversation_id = manager.create_conversation()
             active_conversations[conversation_id] = manager
@@ -103,26 +140,114 @@ async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
             # Process user message
             user_message = message_data.get("message", "")
             
+            # Check for harmful content if moderation is enabled
+            if ai_settings.moderation_enabled:
+                is_harmful, categories = moderate_content(user_message)
+                if is_harmful:
+                    await websocket.send_json({
+                        "type": "message",
+                        "role": "assistant",
+                        "content": "I'm sorry, but I cannot respond to this message as it may contain harmful content.",
+                        "conversation_id": conversation_id,
+                        "moderated": True
+                    })
+                    continue
+            
             # Add user message to conversation
             conversation_manager.add_message(conversation_id, "user", user_message)
             
             # Get relevant context
-            context = conversation_manager.retrieve_relevant_context(conversation_id, user_message)
+            context = conversation_manager.retrieve_relevant_context(
+                conversation_id, 
+                user_message,
+                limit=5,  # Could be configurable
+                threshold=0.7  # Could be configurable
+            )
             
-            # TODO: Call AI model for response
-            # For now, use a placeholder response
-            ai_response = f"I received your message: '{user_message}'. This is a placeholder response."
+            # Get chat context for completion
+            chat_context = conversation_manager.get_chat_context(conversation_id)
             
-            # Add assistant response to conversation
-            conversation_manager.add_message(conversation_id, "assistant", ai_response)
+            try:
+                # Check if streaming is requested and enabled
+                stream = message_data.get("stream", False) and ai_settings.stream_enabled
+                
+                if stream:
+                    # Send a "thinking" status to the client
+                    await websocket.send_json({
+                        "type": "status",
+                        "status": "thinking",
+                        "conversation_id": conversation_id
+                    })
+                    
+                    # Get streaming response
+                    response_stream = get_chat_completion(
+                        messages=chat_context,
+                        temperature=ai_settings.temperature,
+                        max_tokens=ai_settings.max_tokens,
+                        model=ai_settings.model,
+                        stream=True
+                    )
+                    
+                    # Initialize variables for collecting the response
+                    full_response = ""
+                    
+                    # Stream the response chunks to the client
+                    for chunk in response_stream:
+                        if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
+                            content = chunk.choices[0].delta.content
+                            if content:
+                                full_response += content
+                                await websocket.send_json({
+                                    "type": "stream",
+                                    "content": content,
+                                    "conversation_id": conversation_id
+                                })
+                    
+                    # Add the complete response to the conversation history
+                    conversation_manager.add_message(conversation_id, "assistant", full_response)
+                    
+                    # Send completion notification
+                    await websocket.send_json({
+                        "type": "stream_end",
+                        "conversation_id": conversation_id
+                    })
+                else:
+                    # Get complete response (non-streaming)
+                    ai_response = get_chat_completion(
+                        messages=chat_context,
+                        temperature=ai_settings.temperature,
+                        max_tokens=ai_settings.max_tokens,
+                        model=ai_settings.model
+                    )
+                    
+                    # Add assistant response to conversation
+                    conversation_manager.add_message(conversation_id, "assistant", ai_response)
+                    
+                    # Send response to client
+                    await websocket.send_json({
+                        "type": "message",
+                        "role": "assistant",
+                        "content": ai_response,
+                        "conversation_id": conversation_id
+                    })
             
-            # Send response to client
-            await websocket.send_json({
-                "type": "message",
-                "role": "assistant",
-                "content": ai_response,
-                "conversation_id": conversation_id
-            })
+            except RateLimitExceededError as e:
+                # Handle rate limit errors specifically
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "The system is currently experiencing high demand. Please try again in a moment.",
+                    "conversation_id": conversation_id,
+                    "retry_after": e.retry_after
+                })
+            except OpenAIServiceError as e:
+                # Handle OpenAI service errors
+                error_message = f"The AI service is currently unavailable: {str(e)}"
+                
+                await websocket.send_json({
+                    "type": "error",
+                    "message": error_message,
+                    "conversation_id": conversation_id
+                })
             
     except WebSocketDisconnect:
         # Handle client disconnect
@@ -167,4 +292,4 @@ async def end_conversation(
             
         return result
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Error ending conversation: {str(e)}") 
+        raise HTTPException(status_code=404, detail=f"Error ending conversation: {str(e)}")

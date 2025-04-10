@@ -15,10 +15,10 @@ Welcome to the Support Agent Project Wiki. This documentation provides comprehen
 ### Infrastructure
 
 - [Supabase Setup and Configuration](./Supabase.md) - Details about the database infrastructure, schemas, and access patterns
+- [OpenAI Integration](./OpenAI.md) - Information about the AI models, embedding generation, and completions
 
 ### Implementation (Coming Soon)
 
-- OpenAI Integration - Information about the AI models and configuration
 - Document Processing Pipeline - Overview of document ingestion and embedding generation
 - Support Agent Core - Documentation for the main agent functionality
 
@@ -39,7 +39,8 @@ To get started with the project:
 
 1. Review the [project plan](../Plan.md) for an overview
 2. Set up the database infrastructure as documented in [Supabase Setup](./Supabase.md)
-3. Follow the implementation tasks in [Tasks](../Tasks.md)
+3. Configure the OpenAI integration as described in the [OpenAI documentation](./OpenAI.md)
+4. Follow the implementation tasks in [Tasks](../Tasks.md)
 
 ## Contributing to Documentation
 

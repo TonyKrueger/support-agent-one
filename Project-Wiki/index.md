@@ -22,6 +22,7 @@ Welcome to the Support Agent Project Wiki. This documentation provides comprehen
 * [Application Layer Chunking](ApplicationLayerChunking.md)
 * [Document Management](DocumentManagement.md)
 * [Vector Search](VectorSearch.md)
+* [Search Similarity Thresholds](SearchThresholds.md)
 * [Observability System](Observability.md)
 * [Chat Interface](ChatInterface.md)
 * [Conversation Management](ConversationManagement.md)

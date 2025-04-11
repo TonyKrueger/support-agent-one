@@ -41,7 +41,17 @@ async def search_documents_page(
     """Document search page."""
     results = []
     if query:
-        results = document_service.search_documents(query)
+        # Get search results
+        search_results = document_service.search_documents(query)
+        
+        # Process results to ensure they have the similarity attribute
+        # The template expects each document to have a similarity attribute
+        for doc in search_results:
+            # If the result is missing the similarity attribute, add a default value
+            if 'similarity' not in doc:
+                doc['similarity'] = 0.75  # Default mid-range similarity
+        
+        results = search_results
     
     return templates.TemplateResponse(
         "documents/search.html", 
@@ -72,15 +82,18 @@ async def create_document(
             # If not valid JSON, treat as plain text
             metadata_dict = {"notes": metadata}
     
-    document_id = document_service.store_document(
+    document = document_service.store_document(
         title=title,
         content=content,
         metadata=metadata_dict
     )
     
-    if not document_id:
+    if not document:
         raise HTTPException(status_code=500, detail="Failed to store document")
         
+    # Extract the document ID from the returned document object
+    document_id = document["id"]
+    
     return RedirectResponse(url=f"/documents/{document_id}", status_code=303)
 
 @router.get("/upload", response_class=HTMLResponse)
@@ -115,15 +128,18 @@ async def upload_document(
         "content_type": file.content_type
     }
     
-    document_id = document_service.store_document(
+    document = document_service.store_document(
         title=title,
         content=content_str,
         metadata=metadata
     )
     
-    if not document_id:
+    if not document:
         raise HTTPException(status_code=500, detail="Failed to store document")
         
+    # Extract the document ID from the returned document object
+    document_id = document["id"]
+    
     return RedirectResponse(url=f"/documents/{document_id}", status_code=303)
 
 @router.get("/{document_id}", response_class=HTMLResponse)

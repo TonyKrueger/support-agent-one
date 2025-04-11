@@ -41,7 +41,7 @@ class DocumentService:
         self.DOCUMENTS_TABLE = "documents"
         self.DOCUMENT_CHUNKS_TABLE = "document_chunks"
         self.EMBEDDING_MODEL = "text-embedding-3-small"
-        self.SIMILARITY_THRESHOLD = 0.1
+        self.SIMILARITY_THRESHOLD = 0.7
         self.MAX_RESULTS = 5
         self.DEFAULT_CHUNK_SIZE = 1000
         self.DEFAULT_CHUNK_OVERLAP = 200

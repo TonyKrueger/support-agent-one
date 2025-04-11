@@ -2,7 +2,7 @@
 title: Support Agent Project Wiki
 description: Central documentation for the Support Agent project
 date_created: 2025-04-09
-last_updated: 2025-04-15
+last_updated: 2025-04-17
 sidebar_position: 0
 ---
 
@@ -22,6 +22,7 @@ Welcome to the Support Agent Project Wiki. This documentation provides comprehen
 * [Application Layer Chunking](ApplicationLayerChunking.md)
 * [Document Management](DocumentManagement.md)
 * [Vector Search](VectorSearch.md)
+* [Observability System](Observability.md)
 * [Chat Interface](ChatInterface.md)
 * [Conversation Management](ConversationManagement.md)
 * [Agent System](AgentSystem.md)
@@ -51,7 +52,7 @@ Each document should:
 4. Include a "last updated" date when making significant changes
 
 ## Last Updated
-Date: 2025-04-15
+Date: 2025-04-17
 
 ## Getting Started
 

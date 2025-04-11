@@ -2,7 +2,7 @@
 title: Application Layer Chunking
 description: Documentation for the application-layer document chunking implementation
 date_created: 2025-04-15
-last_updated: 2025-04-15
+last_updated: 2025-04-17
 tags:
   - documents
   - embeddings
@@ -20,15 +20,20 @@ The application layer chunking system handles document chunking entirely within 
 
 ## Architecture
 
-The application layer chunking system consists of three main components:
+The application layer chunking system consists of several main components:
 
 ```
 app/
   utils/
     text_chunker.py        # Centralized chunking logic
     embedding_pipeline.py  # Document → chunks → embeddings pipeline
+    observability.py       # Performance tracking and metrics
   services/
     document_storage.py    # Transactional storage management
+    search_service.py      # Advanced search capabilities
+  api/v1/
+    documents.py           # Document API endpoints
+    metrics.py             # Metrics API endpoints
 ```
 
 ## Core Components
@@ -148,6 +153,104 @@ Key features:
 - **Bulk Operations**: Efficiently handles batch operations
 - **Error Recovery**: Implements rollback on partial failures
 
+### Search Service
+
+The `search_service.py` module provides advanced search capabilities with relevance ranking and context retrieval:
+
+```python
+from app.services.search_service import SearchService
+
+search = SearchService()
+
+# Basic semantic search
+results = search.search(
+    query="How to configure API keys?",
+    limit=5
+)
+
+# Search with surrounding context
+context_results = search.search(
+    query="Authentication methods",
+    include_context=True
+)
+
+# Search with metadata filtering
+filtered_results = search.search(
+    query="Deploy to production",
+    metadata_filter={"category": "deployment", "version": "1.0"}
+)
+
+# Search with different strategies
+strategy_results = search.search_by_strategy(
+    query="Database migration",
+    strategy="semantic_with_context"
+)
+```
+
+Key features:
+- **Context Retrieval**: Includes surrounding document chunks for better understanding
+- **Relevance Ranking**: Sorts results by their similarity to the query
+- **Metadata Filtering**: Filters results based on document metadata
+- **Multiple Search Strategies**: Supports semantic, context-aware, and hybrid search approaches
+
+### API Endpoints
+
+The document API endpoints have been updated to leverage the enhanced chunking pipeline:
+
+```python
+# Create a document with chunking options
+POST /api/v1/documents/
+{
+  "title": "API Documentation",
+  "content": "Document content...",
+  "metadata": {"category": "technical"},
+  "chunk_size": 800,
+  "chunk_overlap": 150,
+  "chunking_strategy": "markdown",
+  "content_type": "markdown"
+}
+
+# Upload a document file with chunking options
+POST /api/v1/documents/upload
+FormData:
+  - file: <file upload>
+  - title: "User Guide"
+  - metadata_json: {"category": "manual"}
+  - chunk_size: 800
+  - chunk_overlap: 150
+  - chunking_strategy: "markdown"
+
+# Update a document with chunking options
+PUT /api/v1/documents/{document_id}
+{
+  "content": "Updated content...",
+  "chunk_size": 800,
+  "chunk_overlap": 150,
+  "chunking_strategy": "markdown",
+  "replace_chunks": true
+}
+
+# Create chunks for an existing document
+POST /api/v1/documents/{document_id}/chunks?chunk_size=800&chunk_overlap=150&chunking_strategy=markdown
+```
+
+These endpoints provide full access to:
+- Configurable chunking parameters
+- Different chunking strategies
+- Content type detection
+- Chunk management operations
+- Advanced search options
+
+### Observability
+
+The system includes comprehensive observability features for monitoring and optimizing performance. See the [Observability](./Observability.md) documentation for details on:
+
+- Performance tracking for chunking operations
+- Metrics collection for embedding generation
+- Pipeline stage monitoring
+- Detailed logging throughout the process
+- API endpoints for accessing metrics
+
 ## Advantages Over Database Triggers
 
 The application layer approach offers several advantages over database triggers:
@@ -169,6 +272,10 @@ Benefits of the current implementation:
 3. **Optimized Performance**: Batching and caching for efficiency
 4. **Transaction Safety**: Pseudo-transactions for data integrity
 5. **Versioning**: Built-in versioning for change tracking
+6. **Context-Aware Search**: Improved search results with surrounding context
+7. **Multiple Search Strategies**: Flexibility in how documents are retrieved
+8. **Comprehensive Metrics**: Detailed performance tracking and monitoring
+9. **API-First Design**: Full access to chunking capabilities through REST endpoints
 
 ## Usage Examples
 
@@ -197,37 +304,69 @@ document, stored_chunks = storage.store_document_with_chunks(
 )
 ```
 
-### Performing Vector Search
+### Performing Vector Search with Context
 
 ```python
-from app.services.openai_service import get_embeddings
-from app.services.document_storage import DocumentStorage
+from app.services.search_service import SearchService
 
-# Initialize storage
-storage = DocumentStorage()
+# Initialize search service
+search = SearchService()
 
-# Generate embedding for query
-query_embedding = get_embeddings([query_text])[0]
-
-# Search for relevant chunks
-results = storage.search_documents(
-    query_embedding=query_embedding,
-    limit=5,
-    similarity_threshold=0.7
+# Search with context retrieval
+results = search.search(
+    query="How to configure authentication?",
+    include_context=True,
+    limit=3
 )
 
-# Process results
-for chunk in results:
-    print(f"Document: {chunk['title']}")
-    print(f"Content: {chunk['content']}")
-    print(f"Similarity: {chunk['similarity']}")
+# Process and display results
+for result in results:
+    print(f"Document: {result['document_title']}")
+    print(f"Relevance: {result['similarity']:.2f}")
+    print(f"Content: {result['content'][:100]}...")
+    print(f"Is Context: {result.get('is_context', False)}")
+    print("-" * 40)
+```
+
+### Using the API Endpoints
+
+```python
+import requests
+import json
+
+# Create a document with chunking
+response = requests.post(
+    "http://api.example.com/api/v1/documents/",
+    json={
+        "title": "Configuration Guide",
+        "content": "Long document content...",
+        "chunking_strategy": "paragraph",
+        "chunk_size": 800,
+        "metadata": {"type": "guide", "version": "1.0"}
+    }
+)
+document = response.json()
+document_id = document["id"]
+
+# Search documents
+response = requests.get(
+    "http://api.example.com/api/v1/documents/search",
+    params={
+        "query": "How to configure?",
+        "limit": 5,
+        "include_context": "true",
+        "strategy": "semantic_with_context",
+        "metadata_filter": json.dumps({"type": "guide"})
+    }
+)
+results = response.json()["results"]
 ```
 
 ## Related Documentation
 
-- [Document Processing Pipeline](DocumentProcessing.md) - Overview of the document processing pipeline
-- [OpenAI Integration](OpenAI.md) - Details on the OpenAI embedding integration
-- [Supabase Integration](Supabase.md) - Information about the vector database implementation
+- [Document Processing](./DocumentProcessing.md)
+- [Vector Search](./VectorSearch.md)
+- [Observability](./Observability.md)
 
 ## Next Steps
 
@@ -238,4 +377,5 @@ Upcoming enhancements to the application layer chunking system:
 3. **Compression**: Implement storage compression for large documents
 4. **Custom Embedding Models**: Support for custom or local embedding models
 5. **Incremental Updates**: Optimize partial document updates
-6. **Caching Enhancements**: Distributed cache for embedding results 
+6. **Caching Enhancements**: Distributed cache for embedding results
+7. **Advanced Search Features**: Implement exact and hybrid search strategies 

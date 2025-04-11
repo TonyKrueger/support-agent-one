@@ -26,6 +26,7 @@
   - [x] Text chunking system
   - [x] Document embedding generation
   - [x] Vector storage integration
+  - [x] Update API endpoints to use chunking pipeline
 
 ## Phase 2: Support Agent Core
 - [ ] Build basic chat interface
@@ -64,7 +65,10 @@
   - [x] Add metadata and tagging support
 - [ ] Implement document versioning
 - [x] Develop admin interface for knowledge management
-- [ ] Create metrics collection for agent performance
+- [x] Create metrics collection for agent performance
+  - [x] Implement detailed logging for chunking operations
+  - [x] Track performance metrics across document pipeline
+  - [x] Create observability utilities for monitoring
 
 ## Phase 4: Optimization and Expansion
 - [ ] Build Q&A pair generation system for model fine-tuning
@@ -92,7 +96,9 @@
 ## Technical Debt and Maintenance
 - [ ] Documentation for codebase and architecture
 - [x] Set up unit and integration tests
-- [ ] Create system monitoring for production
+- [x] Create system monitoring for production
+  - [x] Implement observability for document operations
+  - [x] Add performance tracking for critical operations
 - [ ] Implement error tracking and resolution system
 - [ ] Create backup and restore procedures 
 

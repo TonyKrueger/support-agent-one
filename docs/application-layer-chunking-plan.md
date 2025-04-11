@@ -55,26 +55,26 @@ This document outlines the implementation plan for managing document chunking in
 ### D. Integration Points
 - [x] Update integration points
   - [x] Modify document_processor.py to use enhanced DocumentService
-  - [ ] Update API endpoints to leverage new chunking pipeline
-  - [ ] Create background processing for large documents
+  - [x] Update API endpoints to leverage new chunking pipeline
+  - [ ] Create background processing for large documents (ON HOLD)
   - [x] Add progress tracking for long-running operations
 
 ## 3. Technical Considerations
 
-- [ ] API Rate Limiting
+- [ ] API Rate Limiting (ON HOLD)
   - [ ] Implement token-based rate limiting for OpenAI
   - [ ] Add queue for processing during rate limit periods
   - [ ] Create monitoring for API usage
 
-- [ ] Efficiency Improvements
+- [ ] Efficiency Improvements (ON HOLD)
   - [ ] Optimize batching for embedding generation
   - [ ] Implement parallel processing where possible
   - [ ] Add compression for large text storage
 
-- [ ] Observability
-  - [ ] Create metrics for chunking operations
-  - [ ] Add detailed logging at each pipeline stage
-  - [ ] Implement performance tracking
+- [x] Observability
+  - [x] Create metrics for chunking operations
+  - [x] Add detailed logging at each pipeline stage
+  - [x] Implement performance tracking
 
 ## 4. Migration Plan
 

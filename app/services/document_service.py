@@ -32,7 +32,7 @@ class DocumentService:
         # Constants
         self.DOCUMENTS_TABLE = "documents"
         self.EMBEDDING_MODEL = "text-embedding-3-small"
-        self.SIMILARITY_THRESHOLD = 0.75
+        self.SIMILARITY_THRESHOLD = 0.1
         self.MAX_RESULTS = 5
     
     def create_embedding(self, text: str) -> List[float]:

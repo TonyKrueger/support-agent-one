@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+
+# Project-Wiki
+We are creating very detailed documentation in the Project-Wiki directory.
+[index.md](mdc:Project-Wiki/index.md) is the main file and all other files should link to this. 
+
+When asked review the index file then create the requested wiki page and link it.
+If needed review other pages and make neccesary edits.
+
+If needed review [Plan.md](mdc:docs/Plan.md), [Tasks.md](mdc:docs/Tasks.md), [stack.md](mdc:docs/stack.md) for more information about our project.

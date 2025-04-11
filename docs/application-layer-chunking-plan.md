@@ -4,20 +4,20 @@ This document outlines the implementation plan for managing document chunking in
 
 ## 1. Core Components
 
-- [ ] **Centralize Chunking Logic**
-  - [ ] Refactor chunking code into a common utility
-  - [ ] Create configurable chunking parameters
-  - [ ] Implement different chunking strategies based on content type
+- [x] **Centralize Chunking Logic**
+  - [x] Refactor chunking code into a common utility
+  - [x] Create configurable chunking parameters
+  - [x] Implement different chunking strategies based on content type
 
-- [ ] **Embedding Pipeline**
-  - [ ] Create unified pipeline for document → chunks → embeddings
-  - [ ] Implement batching for OpenAI API calls
-  - [ ] Add caching layer for frequently requested embeddings
+- [x] **Embedding Pipeline**
+  - [x] Create unified pipeline for document → chunks → embeddings
+  - [x] Implement batching for OpenAI API calls
+  - [x] Add caching layer for frequently requested embeddings
 
-- [ ] **Storage Management**
-  - [ ] Enhance Supabase service to handle transactions
-  - [ ] Implement bulk operations for efficiency
-  - [ ] Add versioning to track document and chunk updates
+- [x] **Storage Management**
+  - [x] Enhance Supabase service to handle transactions
+  - [x] Implement bulk operations for efficiency
+  - [x] Add versioning to track document and chunk updates
 
 ## 2. Implementation Steps
 

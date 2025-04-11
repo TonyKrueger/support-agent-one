@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Documentation and Tasks
+We must continuously maintain our documentation.
+This can be found in the docs directory.
+[Tasks.md](mdc:docs/Tasks.md) is our main task list with subtask lists linked to it.
+After completing a task update the correct files.

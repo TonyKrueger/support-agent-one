@@ -2,7 +2,7 @@
 title: Document Processing Pipeline
 description: Documentation for the document processing pipeline in the Support Agent project
 date_created: 2025-04-09
-last_updated: 2025-04-09
+last_updated: 2025-04-15
 tags:
   - documents
   - embeddings
@@ -23,6 +23,8 @@ The pipeline consists of four main stages:
 3. **Embedding Generation**: Converting text chunks to vector embeddings
 4. **Vector Storage**: Storing embeddings in a vector database for similarity search
 
+> **Note:** Our system now uses the Application Layer Chunking implementation, which provides enhanced chunking capabilities and better integration with OpenAI. See [Application Layer Chunking](ApplicationLayerChunking.md) for details on this implementation.
+
 ## Architecture
 
 The document processing system is implemented as a modular service that coordinates between OpenAI and Supabase:
@@ -33,6 +35,9 @@ app/
     document_processor.py  # Core document processing functions
     openai_service.py      # Embedding generation (via OpenAI)
     supabase_service.py    # Vector storage (via Supabase)
+  utils/
+    text_chunker.py        # Centralized chunking logic (new)
+    embedding_pipeline.py  # Document → chunks → embeddings pipeline (new)
 ```
 
 ## Pipeline Stages

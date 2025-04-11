@@ -11,8 +11,11 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple, Iterator, Union
 from pathlib import Path
 
-from app.services.openai_service import get_embeddings
-from app.services.supabase_service import store_document, store_document_chunks
+# Import our new components
+from app.utils.text_chunker import chunk_text, ChunkingStrategy
+from app.utils.embedding_pipeline import process_text, process_document as pipeline_process_document
+from app.services.document_storage import DocumentStorage, DocumentStorageError
+from app.services.document_service import DocumentService
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -175,6 +178,8 @@ def extract_text_from_string(content: str, content_type: str = 'text') -> str:
         raise DocumentProcessingError(f"Failed to extract text from string: {str(e)}")
 
 
+# Legacy chunking function - replaced with text_chunker.py utility
+# Kept for backward compatibility
 def chunk_text(
     text: str,
     chunk_size: int = 1000,
@@ -182,67 +187,34 @@ def chunk_text(
     separator: str = '\n'
 ) -> List[str]:
     """
-    Split text into overlapping chunks of specified size.
+    Legacy function that now uses the centralized text chunker utility.
     
     Args:
         text: The text to split into chunks
         chunk_size: Maximum size of each chunk in characters
-        chunk_overlap: Size of overlap between chunks in characters
+        chunk_overlap: Size of overlap between chunks
         separator: Preferred separator for chunk boundaries
         
     Returns:
         List of text chunks
     """
-    logger.debug(f"Chunking text into chunks of size {chunk_size} with {chunk_overlap} overlap")
+    logger.debug("Using legacy chunk_text function (redirecting to new utility)")
     
-    if not text:
-        return []
-        
-    # Split text by separator
-    splits = text.split(separator)
+    # Map separator to appropriate chunking strategy
+    if separator == '\n':
+        strategy = ChunkingStrategy.SIMPLE
+    elif separator == '\n\n':
+        strategy = ChunkingStrategy.PARAGRAPH
+    else:
+        strategy = ChunkingStrategy.SIMPLE
     
-    # Handle case where text doesn't contain the separator
-    if len(splits) == 1:
-        # Use a simple character-based chunking
-        return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size - chunk_overlap)]
-    
-    chunks = []
-    current_chunk = []
-    current_size = 0
-    
-    for split in splits:
-        split_size = len(split) + len(separator)
-        
-        # If adding this split would exceed the chunk size and we already have content,
-        # finish the current chunk and start a new one
-        if current_size + split_size > chunk_size and current_chunk:
-            chunks.append(separator.join(current_chunk))
-            
-            # Keep overlapping content for the next chunk
-            overlap_splits = []
-            overlap_size = 0
-            
-            # Work backwards to include content up to chunk_overlap size
-            for item in reversed(current_chunk):
-                item_size = len(item) + len(separator)
-                if overlap_size + item_size <= chunk_overlap:
-                    overlap_splits.insert(0, item)
-                    overlap_size += item_size
-                else:
-                    break
-                    
-            current_chunk = overlap_splits
-            current_size = overlap_size
-            
-        # Add the current split to the chunk
-        current_chunk.append(split)
-        current_size += split_size
-        
-    # Add the last chunk if not empty
-    if current_chunk:
-        chunks.append(separator.join(current_chunk))
-        
-    return chunks
+    # Use the new centralized text chunker
+    return chunk_text(
+        text=text,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        strategy=strategy
+    )
 
 
 def process_document(
@@ -251,7 +223,8 @@ def process_document(
     content_type: str = 'text',
     metadata: Optional[Dict[str, Any]] = None,
     chunk_size: int = 1000,
-    chunk_overlap: int = 200
+    chunk_overlap: int = 200,
+    chunking_strategy: str = None
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """
     Process a document through the entire pipeline: extract, chunk, embed, and store.
@@ -262,7 +235,8 @@ def process_document(
         content_type: Type of content ('text', 'html', 'md', etc.)
         metadata: Optional metadata for the document
         chunk_size: Maximum size of each chunk in characters
-        chunk_overlap: Size of overlap between chunks in characters
+        chunk_overlap: Size of overlap between chunks
+        chunking_strategy: Strategy to use for chunking text
         
     Returns:
         Tuple of (document record, list of chunk records)
@@ -273,45 +247,35 @@ def process_document(
     try:
         logger.info(f"Processing document: {title}")
         
+        # Initialize our document service
+        document_service = DocumentService()
+        
         # Extract text
         extracted_text = extract_text_from_string(content, content_type)
         
-        # Store document
-        document = store_document(title, extracted_text, metadata)
-        document_id = document["id"]
-        logger.debug(f"Stored document with ID: {document_id}")
+        # Prepare metadata
+        if metadata is None:
+            metadata = {}
         
-        # Chunk text
-        chunks = chunk_text(
-            extracted_text,
+        # Add content type to metadata
+        if "content_type" not in metadata:
+            metadata["content_type"] = content_type
+        
+        # Store document with chunks
+        document = document_service.store_document(
+            title=title,
+            content=extracted_text,
+            metadata=metadata,
             chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
+            chunk_overlap=chunk_overlap,
+            chunking_strategy=chunking_strategy
         )
-        logger.debug(f"Created {len(chunks)} chunks from document")
         
-        if not chunks:
-            logger.warning(f"No chunks were created from document: {title}")
-            return document, []
-            
-        # Generate embeddings
-        embeddings = get_embeddings(chunks)
-        logger.debug(f"Generated {len(embeddings)} embeddings")
+        if not document:
+            raise DocumentProcessingError("Failed to store document")
         
-        # Prepare chunk metadata
-        chunk_metadata = []
-        for i in range(len(chunks)):
-            chunk_meta = {"chunk_index": i}
-            if metadata:
-                chunk_meta.update(metadata)
-            chunk_metadata.append(chunk_meta)
-            
-        # Store chunks with embeddings
-        stored_chunks = store_document_chunks(
-            document_id,
-            chunks,
-            embeddings,
-            chunk_metadata
-        )
+        # Get document chunks
+        stored_chunks = document_service.get_document_chunks(document["id"])
         logger.info(f"Stored {len(stored_chunks)} document chunks with embeddings")
         
         return document, stored_chunks
@@ -326,7 +290,8 @@ def process_file(
     title: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
     chunk_size: int = 1000,
-    chunk_overlap: int = 200
+    chunk_overlap: int = 200,
+    chunking_strategy: str = None
 ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """
     Process a file through the entire pipeline: extract, chunk, embed, and store.
@@ -336,7 +301,8 @@ def process_file(
         title: Optional document title (defaults to filename if not provided)
         metadata: Optional metadata for the document
         chunk_size: Maximum size of each chunk in characters
-        chunk_overlap: Size of overlap between chunks in characters
+        chunk_overlap: Size of overlap between chunks
+        chunking_strategy: Strategy to use for chunking text
         
     Returns:
         Tuple of (document record, list of chunk records)
@@ -361,49 +327,105 @@ def process_file(
             "source": "file",
             "filename": file_path.name,
             "extension": file_path.suffix.lower(),
+            "content_type": file_path.suffix.lower().lstrip('.')
         }
         
         if metadata:
             file_metadata.update(metadata)
-            
-        # Store document
-        document = store_document(title, extracted_text, file_metadata)
-        document_id = document["id"]
-        logger.debug(f"Stored document with ID: {document_id}")
         
-        # Chunk text
-        chunks = chunk_text(
-            extracted_text,
+        # Use the process_document function for the rest of the pipeline
+        return process_document(
+            title=title,
+            content=extracted_text,
+            content_type=file_metadata["content_type"],
+            metadata=file_metadata,
             chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
+            chunk_overlap=chunk_overlap,
+            chunking_strategy=chunking_strategy
         )
-        logger.debug(f"Created {len(chunks)} chunks from file")
-        
-        if not chunks:
-            logger.warning(f"No chunks were created from file: {file_path}")
-            return document, []
-            
-        # Generate embeddings
-        embeddings = get_embeddings(chunks)
-        logger.debug(f"Generated {len(embeddings)} embeddings")
-        
-        # Prepare chunk metadata
-        chunk_metadata = []
-        for i in range(len(chunks)):
-            chunk_meta = {"chunk_index": i, **file_metadata}
-            chunk_metadata.append(chunk_meta)
-            
-        # Store chunks with embeddings
-        stored_chunks = store_document_chunks(
-            document_id,
-            chunks,
-            embeddings,
-            chunk_metadata
-        )
-        logger.info(f"Stored {len(stored_chunks)} document chunks with embeddings")
-        
-        return document, stored_chunks
         
     except Exception as e:
         logger.error(f"Error processing file {file_path}: {str(e)}")
-        raise DocumentProcessingError(f"Failed to process file: {str(e)}") 
+        raise DocumentProcessingError(f"Failed to process file: {str(e)}")
+
+
+def process_existing_documents(
+    chunk_size: int = 1000,
+    chunk_overlap: int = 200,
+    limit: int = 100
+) -> Tuple[int, int]:
+    """
+    Process existing documents to create chunks for documents without chunks.
+    
+    Args:
+        chunk_size: Maximum size of each chunk in characters
+        chunk_overlap: Size of overlap between chunks
+        limit: Maximum number of documents to process
+        
+    Returns:
+        Tuple of (number of documents processed, number of chunks created)
+    """
+    try:
+        logger.info(f"Processing existing documents (up to {limit})")
+        
+        # Initialize services
+        document_service = DocumentService()
+        document_storage = DocumentStorage()
+        
+        # Get all documents
+        documents = document_service.get_all_documents(limit=limit)
+        
+        if not documents:
+            logger.info("No documents found to process")
+            return 0, 0
+        
+        processed_count = 0
+        total_chunks = 0
+        
+        for doc in documents:
+            doc_id = doc["id"]
+            
+            # Check if document already has chunks
+            existing_chunks = document_storage.get_document_chunks(doc_id)
+            
+            if existing_chunks:
+                logger.debug(f"Document {doc_id} already has {len(existing_chunks)} chunks")
+                continue
+            
+            # Get full document with content
+            full_doc = document_service.get_document_by_id(doc_id)
+            
+            if not full_doc or "content" not in full_doc:
+                logger.warning(f"Document {doc_id} has no content, skipping")
+                continue
+            
+            # Process content type
+            content_type = "text"
+            if full_doc.get("metadata", {}).get("content_type"):
+                content_type = full_doc["metadata"]["content_type"]
+                
+            # Create chunks for this document
+            try:
+                chunks = document_service.create_document_chunks(
+                    document_id=doc_id,
+                    text=full_doc["content"],
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap,
+                    content_type=content_type
+                )
+                
+                if chunks:
+                    processed_count += 1
+                    total_chunks += len(chunks)
+                    logger.info(f"Created {len(chunks)} chunks for document {doc_id}")
+                    
+            except Exception as e:
+                logger.error(f"Error processing document {doc_id}: {str(e)}")
+                continue
+        
+        logger.info(f"Processed {processed_count} documents, created {total_chunks} chunks")
+        return processed_count, total_chunks
+        
+    except Exception as e:
+        logger.error(f"Error in process_existing_documents: {str(e)}")
+        return 0, 0 
